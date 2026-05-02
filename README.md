@@ -1,7 +1,21 @@
 # Hermes-M — GhostDesk Marketing Agent
 
 > **Local-first AI marketing agent** for GhostDesk.  
-> Fast local drafts via **Ollama (gemma3:4b / hermes)** → quality review via **DeepSeek or OpenAI** → human approval queue → auto-post.
+> Fast local drafts via **NousResearch Hermes Agent** (or Ollama) → quality review via **DeepSeek or OpenAI** → human approval queue → auto-post.
+
+---
+
+## ⚠️ Two Different Things Named "Hermes" — Read This First
+
+There are two separate things in this stack with "Hermes" in the name. Don't confuse them:
+
+| | What it is | How you installed it |
+|---|---|---|
+| **NousResearch Hermes Agent** | A full autonomous agent CLI framework (the `hermes` command) | `curl -fsSL .../install.sh \| bash` |
+| **nous-hermes2** | An LLM model weight (runs inside Ollama) | `ollama pull nous-hermes2` |
+
+**What you installed** (the curl script) is the **NousResearch Hermes Agent framework** — a standalone CLI agent with its own memory, skills, and model selector.  
+This project (`hermes-m`) uses **Ollama** as the local LLM server and calls model weights directly from Python. The Hermes Agent CLI is a separate tool you can run independently.
 
 ---
 
@@ -11,21 +25,21 @@
 User prompt / Scheduler
         │
         ▼
-┌──────────────────────────┐
-│  Ollama  (local, free)   │  ← gemma3:4b-it-qf4_K_M  (or any hermes / llama model)
-│  Fast first-pass draft   │
-└──────────┬───────────────┘
+┌──────────────────────────────┐
+│  Ollama  (local, free)       │  ← serves any model: gemma3:4b, nous-hermes2, etc.
+│  Python client calls it      │    via HTTP at localhost:11434
+└──────────┬───────────────────┘
            │
            ▼
-┌──────────────────────────┐
-│  Review LLM  (cloud)     │  ← DeepSeek Chat  (default, cheapest)
-│  Quality polish          │     or OpenAI GPT-4o-mini / GPT-4o
-└──────────┬───────────────┘
+┌──────────────────────────────┐
+│  Review LLM  (cloud)         │  ← DeepSeek Chat  (default, cheapest)
+│  Quality polish              │     or OpenAI GPT-4o-mini / GPT-4o
+└──────────┬───────────────────┘
            │
            ▼
-┌──────────────────────────┐
-│  Approval Queue (SQLite) │  ← you approve/reject via Web UI or CLI
-└──────────┬───────────────┘
+┌──────────────────────────────┐
+│  Approval Queue (SQLite)     │  ← you approve/reject via Web UI or CLI
+└──────────┬───────────────────┘
            │
            ▼
     Reddit / LinkedIn / Gmail
@@ -38,7 +52,8 @@ User prompt / Scheduler
 | Tool | Version | Purpose |
 |------|---------|---------|
 | Python | ≥ 3.11 | Runtime |
-| [Ollama](https://ollama.com) | latest | Local LLM server |
+| [Ollama](https://ollama.com) | latest | Local LLM server (separate from Hermes Agent CLI) |
+| WSL2 (Windows only) | latest | Required only for the Hermes Agent CLI — **not** required for this project |
 | DeepSeek or OpenAI account | — | Cloud review LLM |
 | Reddit App | — | Posting to subreddits |
 | Gmail App Password | — | Email campaigns |
@@ -48,38 +63,63 @@ User prompt / Scheduler
 
 ## Step 1 — Install Ollama & pull a model
 
-### Install Ollama
-Download from **https://ollama.com/download** and install it.  
+> **Important:** This project uses **Ollama**, not the Hermes Agent CLI you installed.
+> Ollama is a separate, lightweight local model server that runs in the background.
+
+### Install Ollama on Windows
+Download from **https://ollama.com/download/windows** and install it.  
 After install, Ollama runs automatically at `http://localhost:11434`.
 
 ### Pull your model
 
-You said you already pulled `nous-hermes2` (hermes) — that works fine!  
-Or pull the new recommended model:
-
 ```bash
-# Option A — hermes (already installed, works great)
-ollama pull nous-hermes2
-
-# Option B — gemma3 4B (recommended, lighter, faster)
+# Option A — gemma3 4B (recommended — lightweight, fast)
 ollama pull gemma3:4b-it-qf4_K_M
 
-# Option C — gemma4 e4b (newest, if your machine can handle it)
+# Option B — gemma4 e4b (newest)
 ollama pull gemma4:e4b
-```
 
-Then set the model name in your `.env` (see Step 4).
+# Option C — nous-hermes2 (the model weight, if you want to use it)
+ollama pull nous-hermes2
+```
 
 ### Verify Ollama is running
 
 ```bash
-ollama list          # should show your pulled models
-ollama run nous-hermes2 "hello"   # quick sanity check
+ollama list           # shows all pulled models
+ollama run gemma3:4b-it-qf4_K_M "hello"   # quick sanity check
 ```
 
 ---
 
-## Step 2 — Clone & set up Python environment
+## Step 2 — What about the Hermes Agent CLI you installed?
+
+The `hermes` CLI (from `curl -fsSL .../install.sh | bash`) is a **separate autonomous agent framework** by NousResearch. It's a powerful general-purpose AI agent — think of it like a local version of Claude with terminal access, memory, skills, and multi-platform messaging (Telegram, Discord, etc.).
+
+**You can use it in parallel with this project** — they don't conflict. Here's the difference:
+
+| | hermes-m (this project) | NousResearch Hermes Agent |
+|---|---|---|
+| Purpose | GhostDesk marketing automation | General-purpose autonomous agent |
+| LLM backend | Ollama (via Python) | Any provider (OpenRouter, Nous Portal, etc.) |
+| Entry point | `python main.py` | `hermes` CLI command |
+| Interface | Web UI + CLI commands | Terminal TUI / Telegram / Discord |
+| Memory | SQLite queue + chat history | Built-in persistent skills + memory |
+
+> **Note:** The Hermes Agent CLI requires WSL2 on Windows. This project (`hermes-m`) runs natively on Windows with Python.
+
+### Using Hermes Agent CLI (for general tasks)
+```bash
+# In WSL2 terminal:
+hermes                    # Start interactive TUI
+hermes model              # Switch LLM provider/model
+hermes setup              # Full setup wizard
+hermes gateway start      # Connect to Telegram/Discord
+```
+
+---
+
+## Step 3 — Clone & set up Python environment
 
 ```bash
 git clone https://github.com/vaguemit/hermes-m.git
@@ -93,57 +133,55 @@ python -m venv .venv
 .venv\Scripts\Activate.ps1
 # Windows CMD:
 .venv\Scripts\activate.bat
-# macOS/Linux:
+# macOS/Linux/WSL2:
 source .venv/bin/activate
 ```
 
 ---
 
-## Step 3 — Install Python dependencies
+## Step 4 — Install Python dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-This installs:
-- `ollama` — Python client for local Ollama
-- `openai` — used for **both** OpenAI and DeepSeek (DeepSeek is OpenAI-compatible)
+Installs:
+- `ollama` — Python client for local Ollama API
+- `openai` — used for **both** OpenAI and DeepSeek (DeepSeek uses OpenAI-compatible API)
 - `fastapi` + `uvicorn` — Web UI server
 - `praw` — Reddit API
-- `apscheduler` — Scheduled jobs (auto-draft every Tue/Fri)
+- `apscheduler` — Scheduled jobs
 - `rich` + `typer` — CLI
-- `pydantic-settings` — Config from `.env`
+- `pydantic-settings` — Config loader
 
 ---
 
-## Step 4 — Configure `.env`
-
-Copy the example and fill in your secrets:
+## Step 5 — Configure `.env`
 
 ```bash
 cp .env.example .env
 ```
 
-Open `.env` and edit:
+Edit `.env`:
 
 ```env
-# ── Local LLM ─────────────────────────────────────────────────────────────────
+# ── Local LLM (Ollama) ────────────────────────────────────────────────────────
 OLLAMA_HOST=http://localhost:11434
-OLLAMA_MODEL=nous-hermes2        # ← change to gemma3:4b-it-qf4_K_M if you pulled that
+OLLAMA_MODEL=gemma3:4b-it-qf4_K_M    # or: nous-hermes2, gemma4:e4b, llama3.1
 
 # ── Review LLM ────────────────────────────────────────────────────────────────
-REVIEW_PROVIDER=deepseek         # or: openai
+REVIEW_PROVIDER=deepseek              # or: openai
 
-# DeepSeek (cheap, ~$0.0014/1K tokens) → https://platform.deepseek.com/api_keys
+# DeepSeek → https://platform.deepseek.com/api_keys
 DEEPSEEK_API_KEY=sk-...
-DEEPSEEK_MODEL=deepseek-chat     # or: deepseek-reasoner (chain-of-thought, slower)
+DEEPSEEK_MODEL=deepseek-chat          # or: deepseek-reasoner (chain-of-thought)
 
-# OpenAI (only needed if REVIEW_PROVIDER=openai)
+# OpenAI → https://platform.openai.com/api-keys
 OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-4o-mini         # or: gpt-4o
+OPENAI_MODEL=gpt-4o-mini              # or: gpt-4o
 
 # ── Reddit OAuth ───────────────────────────────────────────────────────────────
-# Create app at: https://www.reddit.com/prefs/apps  (choose "script" type)
+# Create app at: https://www.reddit.com/prefs/apps  (type: "script")
 REDDIT_CLIENT_ID=...
 REDDIT_CLIENT_SECRET=...
 REDDIT_USERNAME=your_username
@@ -151,146 +189,110 @@ REDDIT_PASSWORD=your_password
 REDDIT_USER_AGENT=GhostDeskAgent/1.0 by /u/your_username
 
 # ── Gmail SMTP ─────────────────────────────────────────────────────────────────
-# Use an App Password (NOT your real password)
-# Enable at: https://myaccount.google.com/apppasswords
+# Use App Password: https://myaccount.google.com/apppasswords
 GMAIL_ADDRESS=your@gmail.com
 GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
 
-# ── Razorpay (analytics, optional) ────────────────────────────────────────────
+# ── Razorpay (optional, for analytics) ────────────────────────────────────────
 RAZORPAY_KEY_ID=rzp_live_...
 RAZORPAY_KEY_SECRET=...
 
 # ── Agent behavior ─────────────────────────────────────────────────────────────
-APPROVAL_REQUIRED=true           # false = auto-post without asking (risky!)
+APPROVAL_REQUIRED=true
 CHAT_PORT=8765
 LOG_LEVEL=INFO
 ```
 
-### Getting API keys
+### Getting API keys quickly
 
-**DeepSeek** (recommended — very cheap):
-1. Go to https://platform.deepseek.com/api_keys
-2. Create a key → paste as `DEEPSEEK_API_KEY`
+**DeepSeek** (~$0.001/review, recommended):
+1. https://platform.deepseek.com/api_keys → Create key → paste as `DEEPSEEK_API_KEY`
 
 **OpenAI** (alternative):
-1. Go to https://platform.openai.com/api-keys
-2. Create a key → paste as `OPENAI_API_KEY`
-3. Set `REVIEW_PROVIDER=openai`
+1. https://platform.openai.com/api-keys → Create key → set `REVIEW_PROVIDER=openai`
 
 **Reddit App**:
-1. Go to https://www.reddit.com/prefs/apps
-2. Click "create another app" → choose **script**
-3. Name: `GhostDeskAgent`, redirect: `http://localhost:8080`
-4. Copy the client ID (under app name) and secret
+1. https://www.reddit.com/prefs/apps → "create another app" → **script** type
+2. Redirect URI: `http://localhost:8080`
+3. Copy the client ID (shown below app name) and secret
 
 ---
 
-## Step 5 — Run the agent
+## Step 6 — Run
 
-### Option A — Full server (Web UI + scheduler)
+### Full server (Web UI + scheduler)
 
 ```bash
 python main.py start
 ```
 
-This will:
-- Start the APScheduler (auto-drafts Reddit posts Tue/Fri, LinkedIn Wed, analytics Sunday)
-- Run an initial monitor sweep
-- Start the Web UI at **http://localhost:8765**
+Opens the Web UI at **http://localhost:8765**. Includes:
+- Chat interface (type marketing requests)
+- Approval queue (approve/reject before posting)
+- Reports section
 
-Open your browser → `http://localhost:8765` to use the chat interface and approval queue.
-
-### Option B — CLI only (no server)
+### CLI commands
 
 ```bash
-# Interactive chat with the agent
-python main.py chat
-
-# Draft content now
-python main.py draft reddit
-python main.py draft linkedin
-python main.py draft email
-
-# View pending queue
-python main.py queue
-
-# Approve item #3 (posts it to Reddit/Gmail/etc.)
-python main.py approve 3
-
-# Reject item #3
-python main.py reject 3
-
-# Run monitor sweep now (scans Reddit for mentions)
-python main.py monitor
-
-# Generate analytics report now
-python main.py analytics
+python main.py chat              # Interactive chat with the agent
+python main.py draft reddit      # Draft a Reddit post now
+python main.py draft linkedin    # Draft a LinkedIn post now
+python main.py draft email       # Draft an email campaign now
+python main.py queue             # View pending approval queue
+python main.py approve 3         # Approve & post item #3
+python main.py reject 3          # Reject item #3
+python main.py monitor           # Run a Reddit mention sweep now
+python main.py analytics         # Generate Razorpay analytics report
 ```
 
 ---
 
 ## How the pipeline works
 
-### 1. Draft (Ollama — local, free)
-- Runs entirely on your machine
-- Uses the hermes / gemma model you pulled
-- Fast: ~2–5 seconds
-- No API cost
+### Step A — Draft (Ollama, local, free)
+- Gemma/Hermes model runs entirely on your machine
+- ~2–5 seconds, zero API cost
+- Raw first-pass draft
 
-### 2. Review (DeepSeek / OpenAI — cloud)
-- Polishes the draft for tone, clarity, and effectiveness
-- DeepSeek Chat: ~$0.001 per review (very cheap)
-- OpenAI GPT-4o-mini: ~$0.003 per review
-- Skippable: `generate_and_queue(..., skip_review=True)`
+### Step B — Review (DeepSeek / OpenAI, cloud)
+- Polishes tone, clarity, effectiveness
+- DeepSeek Chat: ~$0.001 per call
+- Skip it: `generate_and_queue(..., skip_review=True)`
 
-### 3. Approval queue (SQLite)
-- All content sits in `agent.db` with status `pending`
-- You approve via Web UI or CLI before anything is posted
-- Set `APPROVAL_REQUIRED=false` to auto-post (not recommended)
+### Step C — Approval queue (SQLite)
+- All content sits at `pending` until you approve
+- Nothing posts automatically (unless `APPROVAL_REQUIRED=false`)
 
-### 4. Posting
-- **Reddit** → PRAW posts directly via Reddit OAuth
-- **Email** → Gmail SMTP with App Password
-- **LinkedIn** → Draft stored for manual posting (LinkedIn API requires company page access)
+### Step D — Posting
+- **Reddit** → PRAW via OAuth
+- **Email** → Gmail SMTP
+- **LinkedIn** → draft saved (manual post — LinkedIn API needs company page)
 
 ---
 
-## Switching between hermes and gemma
+## Switching models
 
-Since `OLLAMA_MODEL` is read from `.env`, you can switch anytime without touching code:
+Change `OLLAMA_MODEL` in `.env` — no code changes needed:
 
 ```env
-# Use hermes (already installed)
-OLLAMA_MODEL=nous-hermes2
-
-# Use gemma3 4B (lighter, faster)
-OLLAMA_MODEL=gemma3:4b-it-qf4_K_M
-
-# Use gemma4 e4b (newest)
-OLLAMA_MODEL=gemma4:e4b
+OLLAMA_MODEL=nous-hermes2             # hermes model weight via Ollama
+OLLAMA_MODEL=gemma3:4b-it-qf4_K_M    # gemma3 4B (default)
+OLLAMA_MODEL=gemma4:e4b               # gemma4
+OLLAMA_MODEL=llama3.1                 # Meta Llama 3.1
 ```
 
 ---
 
-## Switching review provider
+## Scheduled jobs (automatic when `python main.py start`)
 
-```env
-# Cheap + great quality (default)
-REVIEW_PROVIDER=deepseek
-DEEPSEEK_MODEL=deepseek-chat
+| Job | When | What |
+|-----|------|------|
+| Monitor sweep | Every 6h | Scans Reddit for GhostDesk / competitor mentions |
+| Reddit draft | Tue + Fri 10am | Auto-drafts a Reddit post → pending queue |
+| LinkedIn draft | Wed 11am | Auto-drafts a LinkedIn post → pending queue |
+| Analytics report | Sun 9am | Weekly Razorpay sales summary |
 
-# DeepSeek with chain-of-thought reasoning (slower, better for complex tasks)
-REVIEW_PROVIDER=deepseek
-DEEPSEEK_MODEL=deepseek-reasoner
-
-# OpenAI fast
-REVIEW_PROVIDER=openai
-OPENAI_MODEL=gpt-4o-mini
-
-# OpenAI max quality
-REVIEW_PROVIDER=openai
-OPENAI_MODEL=gpt-4o
-```
+Nothing posts until you approve it.
 
 ---
 
@@ -303,7 +305,7 @@ hermes-m/
 ├── chat_server.py       # FastAPI web server + HTML UI
 ├── config.py            # Settings loaded from .env (pydantic-settings)
 ├── memory.py            # SQLite: queue, chat history, monitor cache
-├── scheduler_setup.py   # APScheduler jobs (auto content calendar)
+├── scheduler_setup.py   # APScheduler cron jobs
 ├── tools/
 │   ├── reddit.py        # PRAW Reddit posting
 │   ├── email_tool.py    # Gmail SMTP campaigns
@@ -311,45 +313,43 @@ hermes-m/
 │   ├── monitor.py       # Reddit mention monitoring
 │   └── analytics.py     # Razorpay analytics reports
 ├── requirements.txt
-├── .env.example         # Template — copy to .env
-└── agent.db             # Created automatically on first run (SQLite)
+├── .env.example         # Copy to .env and fill in your keys
+└── agent.db             # Auto-created on first run (SQLite)
 ```
-
----
-
-## Scheduled jobs (automatic)
-
-| Job | Schedule | What it does |
-|-----|----------|-------------|
-| Monitor sweep | Every 6 hours | Scans Reddit for GhostDesk / competitor mentions |
-| Reddit draft | Tue + Fri 10am | Drafts a post → queued for your approval |
-| LinkedIn draft | Wed 11am | Drafts a post → queued for your approval |
-| Analytics report | Sun 9am | Generates weekly Razorpay sales summary |
-
-All scheduled content goes to the approval queue — **nothing posts automatically** unless you set `APPROVAL_REQUIRED=false`.
 
 ---
 
 ## Troubleshooting
 
 ### `ollama: connection refused`
-Ollama isn't running. Start it:
+Ollama isn't running. Open a new terminal and run:
 ```bash
 ollama serve
 ```
+Or just restart your PC — Ollama auto-starts on login.
 
 ### `DEEPSEEK_API_KEY is not set`
-Make sure `.env` exists (not just `.env.example`) and has the key filled in.
+Make sure `.env` exists (not just `.env.example`) with the key set.
+
+### PowerShell won't activate venv
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+.venv\Scripts\Activate.ps1
+```
 
 ### `praw.exceptions.OAuthException`
-Check your Reddit `CLIENT_ID`, `CLIENT_SECRET`, `USERNAME`, `PASSWORD` in `.env`. Make sure the Reddit app type is **script**.
+Your Reddit credentials in `.env` are wrong. Check `CLIENT_ID`, `CLIENT_SECRET`, `USERNAME`, `PASSWORD`. App type must be **script**.
 
 ### `SMTPAuthenticationError` (Gmail)
-Use an **App Password**, not your real Gmail password.  
+Use an **App Password**, not your Gmail password.  
 Enable at: https://myaccount.google.com/apppasswords
 
 ### `ModuleNotFoundError`
-Make sure your virtual environment is activated and you ran `pip install -r requirements.txt`.
+Virtual environment not active, or deps not installed:
+```bash
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
 
 ---
 
@@ -357,8 +357,8 @@ Make sure your virtual environment is activated and you ran `pip install -r requ
 
 | Component | Cost |
 |-----------|------|
-| Ollama (local) | **$0** — runs on your machine |
-| DeepSeek Chat (review, ~200 reviews/mo) | **~$0.30** |
+| Ollama (local drafts) | **$0** |
+| DeepSeek Chat (~200 reviews) | **~$0.30** |
 | OpenAI GPT-4o-mini (if used) | **~$0.60** |
 | Reddit API | **Free** |
 | Gmail SMTP | **Free** |
